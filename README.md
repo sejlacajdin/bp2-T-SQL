@@ -1,4 +1,3 @@
 # bp2-sql
 
-Originalne SQL skripte su prilagođene SQL Server 2014 verziji.
-
+Zadaci su rađeni nad bazama AdventureWorks2014, Northwnd i pubs
