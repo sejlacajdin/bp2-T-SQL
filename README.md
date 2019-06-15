@@ -1,2 +1,4 @@
 # bp2-sql
-Riješeni zadaci iz predmeta Baze podataka 2 (FIT Mostar)
+
+Originalne SQL skripte su prilagođene SQL Server 2014 verziji.
+
