@@ -1,0 +1,226 @@
+use master 
+go
+--1
+create database _IB160065 
+go
+use _IB160065
+go
+
+--2a
+create table Autori(
+AutorID nvarchar(11) not null constraint PK_Autor primary key,
+Prezime nvarchar(25) not null,
+Ime nvarchar(25) not null,
+ZipKod nvarchar(5) default null,
+DatumKreiranjaZapisa date not null default sysdatetime(),
+DatumModifikovanjaZapisa date default null
+);
+
+create table Izdavaci(
+IzdavacID nvarchar(4) not null constraint PK_Izdavac primary key,
+Naziv nvarchar(100) not null constraint UQ_Naziv unique,
+Biljeske nvarchar(1000) default 'Lorem ipsum',
+DatumKreiranjaZapisa date not null default sysdatetime(),
+DatumModifikovanjaZapisa date default null);
+
+create table Naslovi(
+NaslovID nvarchar(6) not null constraint PK_Naslov primary key,
+IzdavacID nvarchar(4) not null constraint FK_Izdavac foreign key references Izdavaci(IzdavacID),
+Naslov nvarchar(100) not null,
+Cijena money,
+Biljeske nvarchar(200) default ' The quick brown fox jumps over the lazy dog',
+DatumIzdavanja date not null default sysdatetime(),
+DatumKreiranjaZapisa date not null default sysdatetime(),
+DatumModifikovanjaZapisa date default null);
+
+create table NasloviAutori(
+AutorID nvarchar(11) not null constraint FK_Autor foreign key references Autori(AutorID),
+NaslovID nvarchar(6) not null constraint FK_Naslov foreign key references Naslovi(NaslovID),
+constraint PK_AutorNaslov primary key(AutorID,NaslovID),
+DatumKreiranjaZapisa date not null default sysdatetime(),
+DatumModifikovanjaZapisa date default null);
+
+--2b
+insert into Autori(AutorID,Prezime,Ime,ZipKod)
+select a.au_id,a.au_lname,a.au_fname,a.zip
+from pubs.dbo.authors as a
+order by NEWID()
+
+insert into Izdavaci(IzdavacID,Naziv,Biljeske)
+select p.pub_id, p.pub_name, left(cast(pi.pr_info as nvarchar),100)
+from pubs.dbo.publishers as p join pubs.dbo.pub_info as pi on p.pub_id=pi.pub_id
+order by NEWID()
+
+insert into Naslovi(NaslovID,IzdavacID,Naslov,Cijena,Biljeske)
+select t.title_id, t.pub_id, t.title, t.price, t.notes
+from pubs.dbo.titles as t
+
+insert into NasloviAutori(AutorID,NaslovID)
+select ta.au_id,ta.title_id
+from pubs.dbo.titleauthor as ta
+
+--2c
+create table Gradovi(
+GradID int not null identity(1,2) constraint PK_Grad primary key,
+Naziv nvarchar(100) not null constraint UQ_NazivGrad unique,
+DatumKreiranjaZapisa date not null default sysdatetime(),
+DatumModifikovanjaZapisa date default null);
+
+insert into Gradovi(Naziv)
+select distinct a.city
+from pubs.dbo.authors as a 
+where a.city is not null
+
+alter table Autori 
+add GradID int  constraint FK_Grad foreign key references Gradovi(GradID)
+
+--2d
+create proc proc_Autori_SaltLake
+as
+begin
+update Autori
+set GradID= (select GradID
+             from Gradovi
+			 where Naziv='Salt Lake City') 
+where AutorID in (select top 5 AutorID
+                  from Autori)
+end;
+
+exec proc_Autori_SaltLake
+select* from Autori
+
+create proc proc_Autori_Oaklad
+as
+begin
+update Autori
+set GradID=(select GradID
+            from Gradovi 
+			where Naziv='Oakland')
+where GradID is null 
+end;
+
+exec proc_Autori_Oaklad
+select* from Autori
+
+--3
+create view view_Autori_Izdavaci
+as
+select A.Prezime+' '+A.Ime as 'Ime i prezime', G.Naziv as Grad, N.Naslov, N.Cijena, N.Biljeske,
+       I.Naziv as Izdavac 
+from Autori as A join Gradovi as G on A.GradID=G.GradID 
+     join NasloviAutori as NA on A.AutorID=NA.AutorID
+	 join Naslovi as N on NA.NaslovID=N.NaslovID
+	 join Izdavaci as I on N.IzdavacID=I.IzdavacID
+where N.Cijena is not null and N.Cijena>5 and I.Naziv not like '%&%' and G.Naziv='Salt Lake City'
+
+select* from view_Autori_Izdavaci
+
+--4
+alter table Autori 
+add Email nvarchar(100) default null
+
+--5
+create proc proc_Autori_Email_SaltLake
+as
+begin
+update Autori
+set Email= Ime+'.'+Prezime+'@fit.ba'
+where GradID=(select GradID
+              from Gradovi
+			  where Naziv='Salt Lake City') 
+end;
+
+exec proc_Autori_Email_SaltLake
+select* from Autori
+
+create proc proc_Autori_Email_Oakland
+as
+begin
+update Autori
+set Email=Prezime+'.'+Ime+'@fit.ba'
+where  GradID=(select GradID
+              from Gradovi
+			  where Naziv='Oakland') 
+end;
+
+exec proc_Autori_Email_Oakland
+select* from Autori
+
+--6
+select isnull(P.Title,'N/A') as Title, P.LastName, P.FirstName, EA.EmailAddress, PP.PhoneNumber, CC.CardNumber, P.FirstName+'.'+P.LastName as 'UserName',
+       lower(replace(left(newid(),24),'-',7)) as 'Password'
+into #tempAdventureWorks
+from AdventureWorks2014.Person.Person as P join AdventureWorks2014.Person.EmailAddress as EA on P.BusinessEntityID=EA.BusinessEntityID
+     join AdventureWorks2014.Person.PersonPhone as PP on P.BusinessEntityID=PP.BusinessEntityID
+	left join AdventureWorks2014.Sales.PersonCreditCard as PCC on P.BusinessEntityID=PCC.BusinessEntityID
+	left join AdventureWorks2014.Sales.CreditCard as CC on PCC.CreditCardID=CC.CreditCardID
+order by P.LastName, P.FirstName
+
+select* from #tempAdventureWorks
+
+select*
+into tempAdventureWorks
+from #tempAdventureWorks
+
+select* from tempAdventureWorks
+--7
+create nonclustered index ix_Tempdb_Name on tempAdventureWorks (LastName,FirstName)
+include(UserName)
+
+select LastName,FirstName,UserName
+from tempAdventureWorks
+where CardNumber=77776131068877
+
+--8
+create proc porc_delete_tempdb_creditcard
+as
+begin
+delete from tempAdventureWorks
+where CardNumber is not null
+end;
+
+exec porc_delete_tempdb_creditcard
+select * from tempAdventureWorks
+where CardNumber is not null
+
+--9
+backup database _IB160065
+to disk='_IB160065.bak'
+
+drop table tempAdventureWorks
+
+--10a
+create proc proc_delete_allrecord
+as
+begin
+delete from NasloviAutori
+delete from  Naslovi
+delete from Autori
+delete from Gradovi
+delete from Izdavaci
+end;
+
+exec proc_delete_allrecord
+
+select * from NasloviAutori
+select * from  Naslovi
+select * from Autori
+select * from Gradovi
+select * from Izdavaci
+
+--10b
+use master 
+go
+
+restore database _IB160065
+from disk='_IB160065.bak'
+with replace 
+
+use _IB160065
+go
+select * from NasloviAutori
+select * from  Naslovi
+select * from Autori
+select * from Gradovi
+select * from Izdavaci
+select* from tempAdventureWorks
