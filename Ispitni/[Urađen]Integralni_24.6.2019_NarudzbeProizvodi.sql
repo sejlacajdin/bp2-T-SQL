@@ -50,7 +50,7 @@ from NORTHWND.dbo.Products as P join NORTHWND.dbo.Suppliers as S on P.SupplierID
 
 --c)
 insert into DetaljiNarudzbe
-select OD.OrderID,OD.ProductID, round(OD.UnitPrice,0), OD.Quantity, OD.Discount
+select OD.OrderID,OD.ProductID, floor(OD.UnitPrice), OD.Quantity, OD.Discount
 from NORTHWND.dbo.[Order Details] as OD
 
 --3
